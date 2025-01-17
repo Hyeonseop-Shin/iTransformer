@@ -28,14 +28,14 @@ class FullAttention(nn.Module):
         scores = torch.einsum('blhe,bshe->bhls', queries, keys)
 
         # masking process for decoder, but we use encoder only.
-        # if self.mask_flag:
-        #     if attn_mask is None:
-        #         attn_mask = TriangularCausalMask(B, L, device=queries.device)
+        if self.mask_flag:
+            if attn_mask is None:
+                attn_mask = TriangularCausalMask(B, L, device=queries.device)
 
-        #     scores.masked_fill_(attn_mask.mask, -np.inf)
+            scores.masked_fill_(attn_mask.mask, -np.inf)
 
         A = self.dropout(torch.softmax(scale * scores, dim=-1))
-        V = torch.einsum('blhs,bshd->blhd', A, values)
+        V = torch.einsum('bhls,bshd->blhd', A, values)
 
         if self.output_attention:
             return V.contiguous(), A
@@ -49,6 +49,9 @@ class AttentionLayer(nn.Module):
 
         self.inner_attention = attention
         self.n_heads = n_heads
+
+        d_keys = d_keys or (d_model // n_heads)
+        d_values = d_values or (d_model // n_heads)
 
         self.query_projection = nn.Linear(d_model, d_keys * n_heads)
         self.key_projection = nn.Linear(d_model, d_keys * n_heads)
@@ -65,10 +68,10 @@ class AttentionLayer(nn.Module):
         values = self.value_projection(values).view(B, S, H, -1)
 
         output, attn = self.inner_attention(
-            queries,
-            keys,
-            values,
-            attn_mask,
+            queries=queries,
+            keys=keys,
+            values=values,
+            attn_mask=attn_mask,
             tau=tau,
             delta=delta
         )

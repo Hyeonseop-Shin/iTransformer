@@ -24,10 +24,12 @@ class Model(nn.Module):
             attn_layers=[
                 EncoderLayer(
                     attention=AttentionLayer(
-                        FullAttention(mask_flag=False,
+                        attention=FullAttention(mask_flag=False,
                                       scale=configs.factor,
                                       attention_dropout=configs.dropout,
-                                      output_attention=False)
+                                      output_attention=False),
+                        d_model=configs.d_model,
+                        n_heads=configs.n_heads
                     ),
                     d_model=configs.d_model,
                     d_ff=configs.d_ff,
@@ -57,6 +59,9 @@ class Model(nn.Module):
         enc_out = self.enc_embedding(x_enc, x_mark_enc)
         enc_out, attns = self.encoder(enc_out, attn_mask=None)
         dec_out = self.projection(enc_out).transpose(-1, 1)[:, :, :N]
+
+        dec_out = dec_out * (stdev[:, 0, :].unsqueeze(1).repeat(1, self.pred_len, 1))
+        dec_out = dec_out + (means[:, 0, :].unsqueeze(1).repeat(1, self.pred_len, 1))
 
         return dec_out
     
